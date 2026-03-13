@@ -83,7 +83,11 @@ class Qwen3_VQA:
                     ],
                 ),
             },
-            "optional": {"source_path": ("PATH",), "image": ("IMAGE",)},
+            "optional": {
+                "system_instruction": ("STRING", {"default": "", "multiline": True}), # 新增 System Role 接口
+                "source_path": ("PATH",), 
+                "image": ("IMAGE",)
+            },
         }
 
     RETURN_TYPES = ("STRING",)
@@ -101,6 +105,7 @@ class Qwen3_VQA:
         max_pixels,
         seed,
         quantization,
+        system_instruction="", # 接收系统指令
         source_path=None,
         image=None,  # add image parameter
         attention="eager",
@@ -166,37 +171,58 @@ class Qwen3_VQA:
             pil_image = ToPILImage()(image[0].permute(2, 0, 1))
             temp_path = Path(folder_paths.temp_directory) / f"temp_image_{seed}.png"
             pil_image.save(temp_path)
-
+   
         with torch.no_grad():
             if source_path:
-                messages = [
-                    {
-                        "role": "system",
-                        "content": "You are QwenVL, you are a helpful assistant expert in turning images into words.",
-                    },
-                    {
+                sys_content = system_instruction.strip() if system_instruction and system_instruction.strip() else "You are QwenVL, you are a helpful assistant expert in turning images into words."
+                messages = [{"role": "system", "content": sys_content}]
+                messages.append({
                         "role": "user",
                         "content": source_path
                         + [
                             {"type": "text", "text": text},
                         ],
-                    },
-                ]
+                    })
+                # messages = [
+                #     {
+                #         "role": "system",
+                #         "content": "You are QwenVL, you are a helpful assistant expert in turning images into words.",
+                #     },
+                #     {
+                #         "role": "user",
+                #         "content": source_path
+                #         + [
+                #             {"type": "text", "text": text},
+                #         ],
+                #     },
+                # ]
             elif temp_path:
-                messages = [
-                    {
-                        "role": "system",
-                        "content": "You are QwenVL, you are a helpful assistant expert in turning images into words.",
-                    },
-                    {
+                    sys_content = system_instruction.strip() if system_instruction and system_instruction.strip() else "You are QwenVL, you are a helpful assistant expert in turning images into words."
+                    messages = [{"role": "system", "content": sys_content}]
+                    messages.append({
                         "role": "user",
                         "content": [
                             {"type": "image", "image": f"file://{temp_path}"},
                             {"type": "text", "text": text},
                         ],
-                    },
-                ]
+                    })
+                # messages = [
+                #     {
+                #         "role": "system",
+                #         "content": "You are QwenVL, you are a helpful assistant expert in turning images into words.",
+                #     },
+                #     {
+                #         "role": "user",
+                #         "content": [
+                #             {"type": "image", "image": f"file://{temp_path}"},
+                #             {"type": "text", "text": text},
+                #         ],
+                #     },
+                # ]
             else:
+                sys_content = system_instruction.strip() if system_instruction and system_instruction.strip() else ""
+                if not sys_content:
+                    messages = [{"role": "system", "content": sys_content}]
                 messages = [
                     {
                         "role": "user",
@@ -205,7 +231,7 @@ class Qwen3_VQA:
                         ],
                     }
                 ]
-
+    
             # Preparation for inference
             text = self.processor.apply_chat_template(
                 messages, tokenize=False, add_generation_prompt=True
@@ -244,5 +270,16 @@ class Qwen3_VQA:
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()  # release GPU memory
                     torch.cuda.ipc_collect()
+            print(f"Result type: {type(result)}")
+            print(f"Result content: {result}")
 
+            if isinstance(result, list):
+                if len(result) > 0:
+                    # 取出第一条结果（最常见的情况）
+                    result = result[0]
+                else:
+                    result = ""
+            
+            # 2. 确保它确实是 string 类型（防御性编程）
+            result = str(result)
             return (result,)
