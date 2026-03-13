@@ -82,6 +82,7 @@ class Qwen3_VQA:
                         "flash_attention_2",
                     ],
                 ),
+                "device_selection": (["auto", "cuda", "cpu"], {"default": "auto"}), # 新增设备选择
             },
             "optional": {
                 "system_instruction": ("STRING", {"default": "", "multiline": True}), # 新增 System Role 接口
@@ -109,6 +110,7 @@ class Qwen3_VQA:
         source_path=None,
         image=None,  # add image parameter
         attention="eager",
+        device_selection="auto",
     ):
         if seed != -1:
             torch.manual_seed(seed)
@@ -116,6 +118,12 @@ class Qwen3_VQA:
         self.model_checkpoint = os.path.join(
             folder_paths.models_dir, "prompt_generator", os.path.basename(model_id)
         )
+
+        # 1. 确定物理设备
+        if device_selection == "auto":
+            self.device = comfy.model_management.get_torch_device()
+        else:
+            self.device = torch.device(device_selection)
 
         if not os.path.exists(self.model_checkpoint):
             from huggingface_hub import snapshot_download
@@ -221,17 +229,19 @@ class Qwen3_VQA:
                 # ]
             else:
                 sys_content = system_instruction.strip() if system_instruction and system_instruction.strip() else ""
-                if not sys_content:
+                if sys_content:
                     messages = [{"role": "system", "content": sys_content}]
-                messages = [
+                else: 
+                    messages=[]
+                messages.append(
                     {
                         "role": "user",
                         "content": [
                             {"type": "text", "text": text},
                         ],
                     }
-                ]
-    
+                )
+            print(f"Result messages: {messages}")
             # Preparation for inference
             text = self.processor.apply_chat_template(
                 messages, tokenize=False, add_generation_prompt=True
