@@ -7,7 +7,7 @@ class MultiplePathsInput:
         return {
             "required": {
                 "inputcount": ("INT", {"default": 1, "min": 1, "max": 1000, "step": 1}),
-                "path_1": ("PATH",),
+                "path_1": ("STRING", {"forceInput": True, "label": "path(string)"}),
             },
             "optional": {
                 "sample_fps": ("INT", {"default": 1, "min": 1, "max": 1000, "step": 1}),

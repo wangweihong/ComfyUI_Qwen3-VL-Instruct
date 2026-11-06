@@ -9,8 +9,8 @@ app.registerExtension({
         switch (nodeData.name) {
             case "MultiplePathsInput":
                 nodeType.prototype.onNodeCreated = function () {
-                    this._type = "PATH";
-                    this.inputs_offset = nodeData.name.includes("selective") ? 1 : 0;
+                    this._type = "STRING";
+                    this.inputs.find((input) => input.name === "path_1").label = "path(string)";
                     this.addWidget("button", "Update inputs", null, () => {
                         if (!this.inputs) {
                             this.inputs = [];
@@ -18,22 +18,16 @@ app.registerExtension({
                         const target_number_of_inputs = this.widgets.find(
                             (w) => w.name === "inputcount"
                         )["value"];
-                        if (target_number_of_inputs === this.inputs.length) return; // already set, do nothing
-
-                        if (target_number_of_inputs < this.inputs.length) {
-                            for (
-                                let i = this.inputs.length;
-                                i >= this.inputs_offset + target_number_of_inputs;
-                                i--
-                            )
+                        for (let i = this.inputs.length - 1; i >= 0; i--) {
+                            const pathIndex = /^path_(\d+)$/.exec(this.inputs[i].name);
+                            if (pathIndex && Number(pathIndex[1]) > target_number_of_inputs) {
                                 this.removeInput(i);
-                        } else {
-                            for (
-                                let i = this.inputs.length + 1 - this.inputs_offset;
-                                i <= target_number_of_inputs;
-                                ++i
-                            )
+                            }
+                        }
+                        for (let i = 1; i <= target_number_of_inputs; i++) {
+                            if (!this.inputs.some((input) => input.name === `path_${i}`)) {
                                 this.addInput(`path_${i}`, this._type);
+                            }
                         }
                     });
                 };
